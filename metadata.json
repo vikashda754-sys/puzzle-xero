@@ -1,0 +1,6 @@
+{
+  "name": "Circuit Link",
+  "description": "Rotate circuit traces to route power from the central core to every terminal node without open leaks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

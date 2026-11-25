@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circuit Link — Puzzle Game</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #131b31;
+      --panel-border: #233154;
+      --tile-bg: #17213b;
+      --tile-hover: #1e2b4d;
+      --tile-pinned: #192646;
+      --pipe-off: #3a4a70;
+      --pipe-off-core: #506494;
+      --pipe-on: #00d4ff;
+      --pipe-on-core: #b8f6ff;
+      --node-on: #00f5a0;
+      --source-color: #ffb703;
+      --text: #e8eefc;
+      --muted: #8b9cc4;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(circle at top, #162244 0%, var(--bg) 65%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .title-group h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .controls-top {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    select, button {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    select:hover, button:hover:not(:disabled) {
+      background: #1a2645;
+      border-color: #364b80;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button.active {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: var(--accent);
+      color: #bfeaff;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .stat-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .board-wrap {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+
+    .board {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+    }
+
+    .tile {
+      position: relative;
+      padding: 0;
+      border-radius: 8px;
+      background: var(--tile-bg);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, border-color 0.2s, box-shadow 0.25s;
+    }
+
+    .tile:hover {
+      background: var(--tile-hover);
+      border-color: rgba(148, 163, 184, 0.22);
+    }
+
+    .tile.powered {
+      background: #142642;
+      border-color: rgba(0, 212, 255, 0.22);
+    }
+
+    .tile.pinned {
+      background: var(--tile-pinned);
+      border-color: rgba(251, 191, 36, 0.45);
+    }
+
+    .tile.source {
+      border-color: rgba(255, 183, 3, 0.5);
+      box-shadow: inset 0 0 18px rgba(255, 183, 3, 0.16);
+    }
+
+    .pipe-rotor {
+      width: 100%;
+      height: 100%;
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+    }
+
+    .pipe-rotor svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .pipe-outer {
+      stroke: var(--pipe-off);
+      stroke-width: 22;
+      stroke-linecap: butt;
+      fill: none;
+      transition: stroke 0.22s;
+    }
+
+    .pipe-inner {
+      stroke: var(--pipe-off-core);
+      stroke-width: 10;
+      stroke-linecap: butt;
+      fill: none;
+      transition: stroke 0.22s;
+    }
+
+    .hub-outer {
+      fill: var(--pipe-off);
+      transition: fill 0.22s;
+    }
+
+    .hub-inner {
+      fill: var(--pipe-off-core);
+      transition: fill 0.22s;
+    }
+
+    .bulb-outer {
+      fill: #243356;
+      stroke: var(--pipe-off);
+      stroke-width: 5;
+      transition: fill 0.22s, stroke 0.22s;
+    }
+
+    .bulb-inner {
+      fill: var(--pipe-off-core);
+      transition: fill 0.22s;
+    }
+
+    .tile.powered .pipe-outer {
+      stroke: var(--pipe-on);
+      filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+    }
+
+    .tile.powered .pipe-inner {
+      stroke: var(--pipe-on-core);
+    }
+
+    .tile.powered .hub-outer {
+      fill: var(--pipe-on);
+    }
+
+    .tile.powered .hub-inner {
+      fill: var(--pipe-on-core);
+    }
+
+    .tile.powered .bulb-outer {
+      fill: #083b36;
+      stroke: var(--node-on);
+      filter: drop-shadow(0 0 6px rgba(0, 245, 160, 0.8));
+    }
+
+    .tile.powered .bulb-inner {
+      fill: var(--node-on);
+    }
+
+    .source-badge {
+      position: absolute;
+      width: 38%;
+      height: 38%;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fff3c4 0%, var(--source-color) 65%, #c97a00 100%);
+      box-shadow: 0 0 14px rgba(255, 183, 3, 0.85);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    .source-badge::after {
+      content: "";
+      width: 40%;
+      height: 40%;
+      border-radius: 50%;
+      background: #fffbeb;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .pin-dot {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fbbf24;
+      box-shadow: 0 0 6px rgba(251, 191, 36, 0.9);
+      pointer-events: none;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .help-text {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .win-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      background: rgba(11, 16, 32, 0.86);
+      backdrop-filter: blur(5px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .win-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .win-overlay h2 {
+      margin: 0;
+      font-size: 1.7rem;
+      color: var(--node-on);
+      text-shadow: 0 0 18px rgba(0, 245, 160, 0.45);
+    }
+
+    .win-overlay p {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00d4ff, #00f5a0);
+      color: #06121e;
+      border: none;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 800;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: linear-gradient(135deg, #33e0ff, #33f7b3);
+    }
+
+    @media (max-width: 480px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title-group">
+        <h1>Circuit Link <span class="title-badge" id="levelBadge">Lvl 1</span></h1>
+        <p class="subtitle">Connect every node to the core without leaks.</p>
+      </div>
+      <div class="controls-top">
+        <select id="difficultySelect" aria-label="Grid size">
+          <option value="4">4×4 Easy</option>
+          <option value="5" selected>5×5 Normal</option>
+          <option value="6">6×6 Hard</option>
+          <option value="7">7×7 Expert</option>
+        </select>
+        <button id="soundBtn" title="Toggle sound">🔊</button>
+      </div>
+    </header>
+
+    <div class="stats">
+      <div class="stat-card">
+        <span class="stat-label">Powered</span>
+        <span class="stat-value" id="poweredStat">0 / 25</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Moves</span>
+        <span class="stat-value" id="movesStat">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Time</span>
+        <span class="stat-value" id="timeStat">0:00</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Solved</span>
+        <span class="stat-value" id="solvedStat">0</span>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+      <div class="win-overlay" id="winOverlay">
+        <h2>Circuit Complete!</h2>
+        <p id="winSummary">Solved in 0 moves (0:00)</p>
+        <button class="btn-primary" id="nextLevelBtn">Next Puzzle →</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <button id="undoBtn" disabled>↩ Undo</button>
+        <button id="resetBtn">↺ Reset</button>
+        <button id="pinModeBtn" title="Lock/unlock tiles to prevent accidental turns">📌 Pin Mode</button>
+      </div>
+      <button id="newPuzzleBtn">✨ New Puzzle</button>
+    </div>
+
+    <div class="help-text">
+      Click/Tap: Rotate CW &nbsp;•&nbsp; Right-Click: Rotate CCW &nbsp;•&nbsp; Shift+Click: Pin Tile
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      // Bitmasks: 1 = UP, 2 = RIGHT, 4 = DOWN, 8 = LEFT
+      const DIR = [
+        { dr: -1, dc: 0, bit: 1, opp: 4 }, // UP
+        { dr: 0, dc: 1, bit: 2, opp: 8 },  // RIGHT
+        { dr: 1, dc: 0, bit: 4, opp: 1 },  // DOWN
+        { dr: 0, dc: -1, bit: 8, opp: 2 }  // LEFT
+      ];
+
+      const boardEl = document.getElementById("board");
+      const difficultyEl = document.getElementById("difficultySelect");
+      const poweredStatEl = document.getElementById("poweredStat");
+      const movesStatEl = document.getElementById("movesStat");
+      const timeStatEl = document.getElementById("timeStat");
+      const solvedStatEl = document.getElementById("solvedStat");
+      const levelBadgeEl = document.getElementById("levelBadge");
+      const winOverlayEl = document.getElementById("winOverlay");
+      const winSummaryEl = document.getElementById("winSummary");
+
+      const undoBtn = document.getElementById("undoBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const pinModeBtn = document.getElementById("pinModeBtn");
+      const newPuzzleBtn = document.getElementById("newPuzzleBtn");
+      const nextLevelBtn = document.getElementById("nextLevelBtn");
+      const soundBtn = document.getElementById("soundBtn");
+
+      let size = 5;
+      let grid = [];
+      let source = { r: 2, c: 2 };
+      let moves = 0;
+      let seconds = 0;
+      let timerId = null;
+      let won = false;
+      let pinMode = false;
+      let level = 1;
+      let totalSolved = 0;
+      let history = [];
+      let soundEnabled = true;
+      let audioCtx = null;
+
+      try {
+        totalSolved = parseInt(localStorage.getItem("circuit_link_solved") || "0", 10) || 0;
+      } catch {}
+      solvedStatEl.textContent = totalSolved;
+
+      function playTone(freq, duration = 0.06, type = "sine", vol = 0.08) {
+        if (!soundEnabled) return;
+        try {
+          if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (audioCtx.state === "suspended") audioCtx.resume();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + duration);
+        } catch {}
+      }
+
+      function playWinChime() {
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((n, i) => {
+          setTimeout(() => playTone(n, 0.22, "triangle", 0.1), i * 85);
+        });
+      }
+
+      function rotateMaskCW(mask, times = 1) {
+        let m = mask;
+        const t = ((times % 4) + 4) % 4;
+        for (let i = 0; i < t; i++) {
+          m = ((m << 1) | (m >> 3)) & 15;
+        }
+        return m;
+      }
+
+      function popCount(mask) {
+        let count = 0;
+        for (let i = 0; i < 4; i++) {
+          if (mask & (1 << i)) count++;
+        }
+        return count;
+      }
+
+      function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m}:${String(s).padStart(2, "0")}`;
+      }
+
+      function generateSpanningTree(n) {
+        const masks = Array.from({ length: n }, () => Array(n).fill(0));
+        const inTree = Array.from({ length: n }, () => Array(n).fill(false));
+        const sr = Math.floor(n / 2);
+        const sc = Math.floor(n / 2);
+
+        inTree[sr][sc] = true;
+        const treeCells = [{ r: sr, c: sc }];
+
+        while (treeCells.length < n * n) {
+          // Prefer connecting from nodes with degree < 3 to avoid trivial 4-way crosses
+          let candidates = [];
+          let fallbackCandidates = [];
+
+          for (const cell of treeCells) {
+            const deg = popCount(masks[cell.r][cell.c]);
+            for (const d of DIR) {
+              const nr = cell.r + d.dr;
+              const nc = cell.c + d.dc;
+              if (nr >= 0 && nr < n && nc >= 0 && nc < n && !inTree[nr][nc]) {
+                const edge = { r: cell.r, c: cell.c, nr, nc, d };
+                if (deg < 3) candidates.push(edge);
+                else fallbackCandidates.push(edge);
+              }
+            }
+          }
+
+          const pool = candidates.length > 0 ? candidates : fallbackCandidates;
+          const chosen = pool[Math.floor(Math.random() * pool.length)];
+
+          masks[chosen.r][chosen.c] |= chosen.d.bit;
+          masks[chosen.nr][chosen.nc] |= chosen.d.opp;
+          inTree[chosen.nr][chosen.nc] = true;
+          treeCells.push({ r: chosen.nr, c: chosen.nc });
+        }
+
+        return { masks, source: { r: sr, c: sc } };
+      }
+
+      function createTileSVG(baseMask) {
+        const deg = popCount(baseMask);
+        let paths = "";
+
+        if (baseMask & 1) paths += `<line x1="50" y1="50" x2="50" y2="0" class="pipe-outer"/><line x1="50" y1="50" x2="50" y2="0" class="pipe-inner"/>`;
+        if (baseMask & 2) paths += `<line x1="50" y1="50" x2="100" y2="50" class="pipe-outer"/><line x1="50" y1="50" x2="100" y2="50" class="pipe-inner"/>`;
+        if (baseMask & 4) paths += `<line x1="50" y1="50" x2="50" y2="100" class="pipe-outer"/><line x1="50" y1="50" x2="50" y2="100" class="pipe-inner"/>`;
+        if (baseMask & 8) paths += `<line x1="50" y1="50" x2="0" y2="50" class="pipe-outer"/><line x1="50" y1="50" x2="0" y2="50" class="pipe-inner"/>`;
+
+        let centerShape = "";
+        if (deg === 1) {
+          centerShape = `<circle cx="50" cy="50" r="20" class="bulb-outer"/><circle cx="50" cy="50" r="8" class="bulb-inner"/>`;
+        } else {
+          centerShape = `<circle cx="50" cy="50" r="11" class="hub-outer"/><circle cx="50" cy="50" r="5" class="hub-inner"/>`;
+        }
+
+        // Order outer lines, inner lines, and center cap cleanly
+        let outerLines = "";
+        let innerLines = "";
+        if (baseMask & 1) { outerLines += `<line x1="50" y1="50" x2="50" y2="0" class="pipe-outer"/>`; innerLines += `<line x1="50" y1="50" x2="50" y2="0" class="pipe-inner"/>`; }
+        if (baseMask & 2) { outerLines += `<line x1="50" y1="50" x2="100" y2="50" class="pipe-outer"/>`; innerLines += `<line x1="50" y1="50" x2="100" y2="50" class="pipe-inner"/>`; }
+        if (baseMask & 4) { outerLines += `<line x1="50" y1="50" x2="50" y2="100" class="pipe-outer"/>`; innerLines += `<line x1="50" y1="50" x2="50" y2="100" class="pipe-inner"/>`; }
+        if (baseMask & 8) { outerLines += `<line x1="50" y1="50" x2="0" y2="50" class="pipe-outer"/>`; innerLines += `<line x1="50" y1="50" x2="0" y2="50" class="pipe-inner"/>`; }
+
+        return `<svg viewBox="0 0 100 100" aria-hidden="true">${outerLines}${innerLines}${centerShape}</svg>`;
+      }
+
+      function computePowerState() {
+        const powered = Array.from({ length: size }, () => Array(size).fill(false));
+        const queue = [{ r: source.r, c: source.c }];
+        powered[source.r][source.c] = true;
+        let count = 1;
+
+        while (queue.length > 0) {
+          const { r, c } = queue.shift();
+          const currMask = rotateMaskCW(grid[r][c].baseMask, grid[r][c].rot);
+
+          for (const d of DIR) {
+            if (!(currMask & d.bit)) continue;
+            const nr = r + d.dr;
+            const nc = c + d.dc;
+            if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+            if (powered[nr][nc]) continue;
+
+            const nextMask = rotateMaskCW(grid[nr][nc].baseMask, grid[nr][nc].rot);
+            if (nextMask & d.opp) {
+              powered[nr][nc] = true;
+              count++;
+              queue.push({ r: nr, c: nc });
+            }
+          }
+        }
+
+        // Verify zero leaking/unmatched pipe ends
+        let leaks = 0;
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const m = rotateMaskCW(grid[r][c].baseMask, grid[r][c].rot);
+            for (const d of DIR) {
+              if (!(m & d.bit)) continue;
+              const nr = r + d.dr;
+              const nc = c + d.dc;
+              if (nr < 0 || nr >= size || nc < 0 || nc >= size) {
+                leaks++;
+              } else {
+                const nm = rotateMaskCW(grid[nr][nc].baseMask, grid[nr][nc].rot);
+                if (!(nm & d.opp)) leaks++;
+              }
+            }
+          }
+        }
+
+        return { powered, count, isComplete: count === size * size && leaks === 0 };
+      }
+
+      function startTimer() {
+        stopTimer();
+        timerId = setInterval(() => {
+          seconds++;
+          timeStatEl.textContent = formatTime(seconds);
+        }, 1000);
+      }
+
+      function stopTimer() {
+        if (timerId !== null) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+      }
+
+      function buildBoardDOM() {
+        boardEl.innerHTML = "";
+        boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const tile = grid[r][c];
+            const btn = document.createElement("button");
+            btn.className = "tile";
+            btn.type = "button";
+            btn.setAttribute("aria-label", `Tile row ${r + 1} column ${c + 1}`);
+
+            const rotor = document.createElement("div");
+            rotor.className = "pipe-rotor";
+            rotor.innerHTML = createTileSVG(tile.baseMask);
+            rotor.style.transform = `rotate(${tile.visualRot * 90}deg)`;
+            btn.appendChild(rotor);
+
+            if (r === source.r && c === source.c) {
+              btn.classList.add("source");
+              const badge = document.createElement("div");
+              badge.className = "source-badge";
+              btn.appendChild(badge);
+            }
+
+            const pinDot = document.createElement("div");
+            pinDot.className = "pin-dot";
+            pinDot.style.display = "none";
+            btn.appendChild(pinDot);
+
+            btn.addEventListener("click", (e) => {
+              if (e.shiftKey || pinMode) {
+                togglePin(r, c);
+              } else {
+                rotateTile(r, c, 1);
+              }
+            });
+
+            btn.addEventListener("contextmenu", (e) => {
+              e.preventDefault();
+              rotateTile(r, c, -1);
+            });
+
+            tile.el = btn;
+            tile.rotorEl = rotor;
+            tile.pinDotEl = pinDot;
+            boardEl.appendChild(btn);
+          }
+        }
+      }
+
+      function togglePin(r, c) {
+        if (won) return;
+        const tile = grid[r][c];
+        tile.pinned = !tile.pinned;
+        tile.el.classList.toggle("pinned", tile.pinned);
+        tile.pinDotEl.style.display = tile.pinned ? "block" : "none";
+        playTone(tile.pinned ? 680 : 420, 0.04, "sine", 0.05);
+      }
+
+      function rotateTile(r, c, delta, isUndo = false) {
+        if (won) return;
+        const tile = grid[r][c];
+        if (!isUndo && tile.pinned) {
+          playTone(180, 0.08, "sawtooth", 0.04);
+          return;
+        }
+        if (tile.baseMask === 15) return; // 4-way cross looks identical in all rotations
+
+        if (!isUndo && moves === 0 && seconds === 0) {
+          startTimer();
+        }
+
+        tile.rot = ((tile.rot + delta) % 4 + 4) % 4;
+        tile.visualRot += delta;
+        tile.rotorEl.style.transform = `rotate(${tile.visualRot * 90}deg)`;
+
+        if (!isUndo) {
+          history.push({ r, c, delta });
+          moves++;
+          playTone(delta > 0 ? 480 : 400, 0.045, "triangle", 0.06);
+        } else {
+          moves = Math.max(0, moves - 1);
+          playTone(340, 0.045, "sine", 0.05);
+        }
+
+        updateBoardState();
+      }
+
+      function updateBoardState() {
+        const { powered, count, isComplete } = computePowerState();
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            grid[r][c].el.classList.toggle("powered", powered[r][c]);
+          }
+        }
+
+        poweredStatEl.textContent = `${count} / ${size * size}`;
+        movesStatEl.textContent = moves;
+        undoBtn.disabled = history.length === 0 || won;
+
+        if (isComplete && !won) {
+          won = true;
+          stopTimer();
+          undoBtn.disabled = true;
+          totalSolved++;
+          solvedStatEl.textContent = totalSolved;
+          try {
+            localStorage.setItem("circuit_link_solved", String(totalSolved));
+          } catch {}
+
+          winSummaryEl.textContent = `Solved in ${moves} move${moves === 1 ? "" : "s"} (${formatTime(seconds)})`;
+          winOverlayEl.classList.add("visible");
+          playWinChime();
+        }
+      }
+
+      function initPuzzle(newLevel = false) {
+        stopTimer();
+        size = parseInt(difficultyEl.value, 10);
+        if (newLevel) level++;
+        levelBadgeEl.textContent = `Lvl ${level}`;
+
+        const generated = generateSpanningTree(size);
+        source = generated.source;
+        grid = Array.from({ length: size }, (_, r) =>
+          Array.from({ length: size }, (_, c) => ({
+            baseMask: generated.masks[r][c],
+            initialRot: 0,
+            rot: 0,
+            visualRot: 0,
+            pinned: false,
+            el: null,
+            rotorEl: null,
+            pinDotEl: null
+          }))
+        );
+
+        // Scramble rotations until puzzle is definitely not already solved
+        let attempts = 0;
+        do {
+          for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+              const mask = grid[r][c].baseMask;
+              let randRot = Math.floor(Math.random() * 4);
+              // Give straight pipes a 50/50 rotated start
+              if ((mask === 5 || mask === 10) && Math.random() < 0.7) {
+                randRot = 1;
+              }
+              grid[r][c].initialRot = randRot;
+              grid[r][c].rot = randRot;
+              grid[r][c].visualRot = randRot;
+            }
+          }
+          attempts++;
+        } while (computePowerState().isComplete && attempts < 10);
+
+        moves = 0;
+        seconds = 0;
+        won = false;
+        history = [];
+        timeStatEl.textContent = "0:00";
+        winOverlayEl.classList.remove("visible");
+
+        buildBoardDOM();
+        updateBoardState();
+      }
+
+      function resetPuzzle() {
+        stopTimer();
+        moves = 0;
+        seconds = 0;
+        won = false;
+        history = [];
+        timeStatEl.textContent = "0:00";
+        winOverlayEl.classList.remove("visible");
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const tile = grid[r][c];
+            tile.rot = tile.initialRot;
+            tile.visualRot = tile.initialRot;
+            tile.pinned = false;
+            tile.el.classList.remove("pinned");
+            tile.pinDotEl.style.display = "none";
+            tile.rotorEl.style.transform = `rotate(${tile.visualRot * 90}deg)`;
+          }
+        }
+        updateBoardState();
+      }
+
+      // Event Listeners
+      undoBtn.addEventListener("click", () => {
+        if (history.length === 0 || won) return;
+        const last = history.pop();
+        rotateTile(last.r, last.c, -last.delta, true);
+      });
+
+      resetBtn.addEventListener("click", resetPuzzle);
+      newPuzzleBtn.addEventListener("click", () => initPuzzle(false));
+      nextLevelBtn.addEventListener("click", () => initPuzzle(true));
+
+      difficultyEl.addEventListener("change", () => {
+        level = 1;
+        initPuzzle(false);
+      });
+
+      pinModeBtn.addEventListener("click", () => {
+        pinMode = !pinMode;
+        pinModeBtn.classList.toggle("active", pinMode);
+      });
+
+      soundBtn.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundBtn.textContent = soundEnabled ? "🔊" : "🔇";
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+          e.preventDefault();
+          if (history.length > 0 && !won) {
+            const last = history.pop();
+            rotateTile(last.r, last.c, -last.delta, true);
+          }
+        }
+      });
+
+      initPuzzle(false);
+    })();
+  </script>
+</body>
+</html>
